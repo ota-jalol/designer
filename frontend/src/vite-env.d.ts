@@ -8,8 +8,9 @@ declare module '*.vue' {
 
 declare module 'vue3-grid-layout-next' {
   import { DefineComponent } from 'vue';
+  import type { LayoutItem } from '@/shared/types';
   export const GridLayout: DefineComponent<{
-    layout: unknown[];
+    layout: LayoutItem[];
     colNum?: number;
     rowHeight?: number;
     isDraggable?: boolean;

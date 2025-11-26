@@ -1,12 +1,14 @@
 import { io, Socket } from 'socket.io-client';
 import type { LayoutItem } from '@shared/types';
 
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+
 class SocketService {
   private socket: Socket | null = null;
 
   connect(): Socket {
     if (!this.socket) {
-      this.socket = io('http://localhost:3001', {
+      this.socket = io(SOCKET_URL, {
         transports: ['websocket'],
         autoConnect: true,
       });

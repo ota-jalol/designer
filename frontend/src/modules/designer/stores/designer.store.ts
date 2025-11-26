@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import type { LayoutItem, Project, ComponentDefinition } from '../types';
 import { api } from '@shared/services/api';
 import { socketService } from '@shared/services/socket';
+import { generateUniqueId } from '@shared/utils/id';
 
 export const useDesignerStore = defineStore('designer', () => {
   // State
@@ -103,9 +104,10 @@ export const useDesignerStore = defineStore('designer', () => {
   function addComponent(component: ComponentDefinition) {
     if (!currentProject.value) return;
 
+    const itemId = generateUniqueId('item');
     const newItem: LayoutItem = {
-      id: `item-${Date.now()}`,
-      i: `item-${Date.now()}`,
+      id: itemId,
+      i: itemId,
       componentType: component.tag,
       x: 0,
       y: layout.value.length * 2,

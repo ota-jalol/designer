@@ -19,7 +19,7 @@
     "test:frontend": "cd frontend && npm run test",
     "test:e2e": "cd frontend && npm run test:e2e",
     "lint": "npm run lint:backend && npm run lint:frontend",
-    "lint:backend": "cd backend && npm run lint || true",
+    "lint:backend": "cd backend && npm run lint",
     "lint:frontend": "cd frontend && npm run lint",
     "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"
   },

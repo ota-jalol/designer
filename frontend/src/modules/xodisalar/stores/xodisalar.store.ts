@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { Event, EventFilter } from '../types';
+import { generateUniqueId } from '@shared/utils/id';
 
 export const useXodisalarStore = defineStore('xodisalar', () => {
   // State
@@ -49,7 +50,7 @@ export const useXodisalarStore = defineStore('xodisalar', () => {
     try {
       const newEvent: Event = {
         ...event,
-        id: `event-${Date.now()}`,
+        id: generateUniqueId('event'),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
