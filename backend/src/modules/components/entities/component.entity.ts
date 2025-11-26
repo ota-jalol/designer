@@ -7,6 +7,7 @@ export interface ComponentDefinition {
   defaultProps: Record<string, unknown>;
   editableProps: PropDefinition[];
   defaultSize: { w: number; h: number };
+  packageName?: string; // npm package this component belongs to
 }
 
 export interface PropDefinition {
@@ -15,4 +16,11 @@ export interface PropDefinition {
   default: unknown;
   options?: string[];
   label: string;
+}
+
+export interface NpmPackageInfo {
+  name: string;
+  version?: string;
+  components: ComponentDefinition[];
+  installed: boolean;
 }

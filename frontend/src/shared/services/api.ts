@@ -2,6 +2,18 @@ import type { Project, LayoutItem, ComponentDefinition, CodeFormat } from '@shar
 
 const API_BASE = '/api';
 
+export interface NpmPackageInfo {
+  name: string;
+  components: ComponentDefinition[];
+  installed: boolean;
+}
+
+export interface PackageInstallResult {
+  success: boolean;
+  message: string;
+  package?: NpmPackageInfo;
+}
+
 export const api = {
   // Designer API
   async createProject(name: string): Promise<Project> {
@@ -53,6 +65,33 @@ export const api = {
 
   async getCategories(): Promise<string[]> {
     const response = await fetch(`${API_BASE}/components/categories`);
+    return response.json();
+  },
+
+  // Package Management API
+  async getSupportedPackages(): Promise<string[]> {
+    const response = await fetch(`${API_BASE}/components/packages/supported`);
+    return response.json();
+  },
+
+  async getInstalledPackages(): Promise<NpmPackageInfo[]> {
+    const response = await fetch(`${API_BASE}/components/packages/installed`);
+    return response.json();
+  },
+
+  async installPackage(packageName: string): Promise<PackageInstallResult> {
+    const response = await fetch(`${API_BASE}/components/packages/install`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ packageName }),
+    });
+    return response.json();
+  },
+
+  async uninstallPackage(packageName: string): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${API_BASE}/components/packages/${encodeURIComponent(packageName)}`, {
+      method: 'DELETE',
+    });
     return response.json();
   },
 };

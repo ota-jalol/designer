@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Query } from '@nestjs/common';
 import { ComponentsService } from '../services/components.service';
 import { ComponentDefinition } from '../entities/component.entity';
 
@@ -17,6 +17,48 @@ export class ComponentsController {
   @Get('categories')
   getCategories() {
     return this.componentsService.getCategories();
+  }
+
+  @Get('packages/supported')
+  getSupportedPackages() {
+    return this.componentsService.getSupportedPackages();
+  }
+
+  @Get('packages/installed')
+  getInstalledPackages() {
+    return this.componentsService.getInstalledPackages();
+  }
+
+  @Get('packages/:packageName/components')
+  getPackageComponents(@Param('packageName') packageName: string) {
+    return this.componentsService.getPackageComponents(packageName);
+  }
+
+  @Post('packages/install')
+  installPackage(@Body('packageName') packageName: string) {
+    const result = this.componentsService.installPackage(packageName);
+    if (!result) {
+      return {
+        success: false,
+        message: `Package '${packageName}' is not supported. Supported packages: ${this.componentsService.getSupportedPackages().join(', ')}`,
+      };
+    }
+    return {
+      success: true,
+      message: `Package '${packageName}' installed successfully with ${result.components.length} components`,
+      package: result,
+    };
+  }
+
+  @Delete('packages/:packageName')
+  uninstallPackage(@Param('packageName') packageName: string) {
+    const success = this.componentsService.uninstallPackage(packageName);
+    return {
+      success,
+      message: success 
+        ? `Package '${packageName}' uninstalled successfully`
+        : `Package '${packageName}' is not installed`,
+    };
   }
 
   @Get(':id')
