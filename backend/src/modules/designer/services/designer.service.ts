@@ -1,70 +1,93 @@
-import { Injectable } from '@nestjs/common';
-import { LayoutItem, Project } from '../entities/designer.entity';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Project } from '../entities/project.entity';
+import { LayoutItem } from '../entities/designer.entity';
+import sanitizeHtml from 'sanitize-html';
 
 @Injectable()
 export class DesignerService {
-  private projects: Map<string, Project> = new Map();
-  private projectCounter = 0;
+  constructor(
+    @InjectRepository(Project)
+    private projectRepository: Repository<Project>,
+  ) {}
 
-  createProject(name: string): Project {
-    this.projectCounter++;
-    const id = `project-${Date.now()}-${this.projectCounter}`;
-    const project: Project = {
-      id,
-      name,
+  async createProject(name: string, ownerId?: string): Promise<Project> {
+    const project = this.projectRepository.create({
+      name: this.sanitizeInput(name),
       layout: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      ownerId,
+    });
+    return this.projectRepository.save(project);
+  }
+
+  async getProject(id: string): Promise<Project> {
+    const project = await this.projectRepository.findOne({ where: { id } });
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${id} not found`);
+    }
+    return project;
+  }
+
+  async getAllProjects(ownerId?: string): Promise<Project[]> {
+    if (ownerId) {
+      return this.projectRepository.find({ where: { ownerId } });
+    }
+    return this.projectRepository.find();
+  }
+
+  async saveLayout(projectId: string, layout: LayoutItem[]): Promise<Project> {
+    const project = await this.getProject(projectId);
+    project.layout = this.sanitizeLayout(layout);
+    return this.projectRepository.save(project);
+  }
+
+  async updateLayoutItem(projectId: string, item: LayoutItem): Promise<Project> {
+    const project = await this.getProject(projectId);
+    const index = project.layout.findIndex(i => i.id === item.id);
+    
+    const sanitizedItem = this.sanitizeLayoutItem(item);
+    
+    if (index >= 0) {
+      project.layout[index] = sanitizedItem;
+    } else {
+      project.layout.push(sanitizedItem);
+    }
+    
+    return this.projectRepository.save(project);
+  }
+
+  async removeLayoutItem(projectId: string, itemId: string): Promise<Project> {
+    const project = await this.getProject(projectId);
+    project.layout = project.layout.filter(i => i.id !== itemId);
+    return this.projectRepository.save(project);
+  }
+
+  async deleteProject(id: string): Promise<void> {
+    const project = await this.getProject(id);
+    await this.projectRepository.remove(project);
+  }
+
+  async exportProject(id: string): Promise<any> {
+    const project = await this.getProject(id);
+    return {
+      name: project.name,
+      layout: project.layout,
+      exportedAt: new Date().toISOString(),
     };
-    this.projects.set(id, project);
-    return project;
   }
 
-  getProject(id: string): Project | undefined {
-    return this.projects.get(id);
+  async importProject(data: any, ownerId?: string): Promise<Project> {
+    const project = this.projectRepository.create({
+      name: this.sanitizeInput(data.name || 'Imported Project'),
+      layout: this.sanitizeLayout(data.layout || []),
+      ownerId,
+    });
+    return this.projectRepository.save(project);
   }
 
-  getAllProjects(): Project[] {
-    return Array.from(this.projects.values());
-  }
-
-  saveLayout(projectId: string, layout: LayoutItem[]): Project | undefined {
-    const project = this.projects.get(projectId);
-    if (project) {
-      project.layout = layout;
-      project.updatedAt = new Date();
-      this.projects.set(projectId, project);
-    }
-    return project;
-  }
-
-  updateLayoutItem(projectId: string, item: LayoutItem): Project | undefined {
-    const project = this.projects.get(projectId);
-    if (project) {
-      const index = project.layout.findIndex(i => i.id === item.id);
-      if (index >= 0) {
-        project.layout[index] = item;
-      } else {
-        project.layout.push(item);
-      }
-      project.updatedAt = new Date();
-      this.projects.set(projectId, project);
-    }
-    return project;
-  }
-
-  removeLayoutItem(projectId: string, itemId: string): Project | undefined {
-    const project = this.projects.get(projectId);
-    if (project) {
-      project.layout = project.layout.filter(i => i.id !== itemId);
-      project.updatedAt = new Date();
-      this.projects.set(projectId, project);
-    }
-    return project;
-  }
-
-  generateCode(projectId: string, format: 'vue' | 'html' = 'vue'): string {
-    const project = this.projects.get(projectId);
+  async generateCode(projectId: string, format: 'vue' | 'html' = 'vue'): Promise<string> {
+    const project = await this.getProject(projectId);
     if (!project) {
       return '';
     }
@@ -73,6 +96,38 @@ export class DesignerService {
       return this.generateVueCode(project.layout);
     }
     return this.generateHtmlCode(project.layout);
+  }
+
+  private sanitizeInput(input: string): string {
+    return sanitizeHtml(input, {
+      allowedTags: [],
+      allowedAttributes: {},
+    });
+  }
+
+  private sanitizeLayoutItem(item: LayoutItem): LayoutItem {
+    return {
+      ...item,
+      componentType: this.sanitizeInput(item.componentType),
+      props: item.props ? this.sanitizeProps(item.props) : undefined,
+      children: item.children ? this.sanitizeLayout(item.children) : undefined,
+    };
+  }
+
+  private sanitizeLayout(layout: LayoutItem[]): LayoutItem[] {
+    return layout.map(item => this.sanitizeLayoutItem(item));
+  }
+
+  private sanitizeProps(props: Record<string, unknown>): Record<string, unknown> {
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(props)) {
+      if (typeof value === 'string') {
+        sanitized[key] = this.sanitizeInput(value);
+      } else {
+        sanitized[key] = value;
+      }
+    }
+    return sanitized;
   }
 
   private generateVueCode(layout: LayoutItem[]): string {

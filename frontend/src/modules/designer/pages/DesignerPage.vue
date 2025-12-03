@@ -9,6 +9,10 @@
         <span class="project-name">{{ currentProject?.name }}</span>
       </div>
       <div class="header-actions">
+        <div class="history-controls">
+          <button @click="handleUndo" :disabled="!canUndo" class="history-btn" title="Undo (Ctrl+Z)">↶</button>
+          <button @click="handleRedo" :disabled="!canRedo" class="history-btn" title="Redo (Ctrl+Y)">↷</button>
+        </div>
         <button @click="createNewProject" class="new-project-btn">+ New Project</button>
         <router-link to="/projects" class="projects-link">Projects</router-link>
       </div>
@@ -50,11 +54,16 @@
         </div>
       </div>
     </div>
+
+    <!-- Error Toast -->
+    <div v-if="store.error" class="error-toast">
+      {{ store.error }}
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useDesignerStore } from '../stores/designer.store';
 import ComponentPalette from '../components/ComponentPalette.vue';
@@ -71,6 +80,8 @@ const newProjectName = ref('');
 
 const hasProject = computed(() => store.hasProject);
 const currentProject = computed(() => store.currentProject);
+const canUndo = computed(() => store.canUndo);
+const canRedo = computed(() => store.canRedo);
 
 onMounted(async () => {
   await store.loadComponents();
@@ -85,7 +96,40 @@ onMounted(async () => {
   } else {
     showNewProjectModal.value = true;
   }
+
+  // Keyboard shortcuts
+  window.addEventListener('keydown', handleKeyDown);
 });
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown);
+});
+
+function handleKeyDown(event: KeyboardEvent) {
+  // Ctrl+Z for undo
+  if (event.ctrlKey && event.key === 'z' && !event.shiftKey) {
+    event.preventDefault();
+    handleUndo();
+  }
+  // Ctrl+Y or Ctrl+Shift+Z for redo
+  else if (event.ctrlKey && (event.key === 'y' || (event.key === 'z' && event.shiftKey))) {
+    event.preventDefault();
+    handleRedo();
+  }
+  // Delete key to remove selected component
+  else if (event.key === 'Delete' && store.selectedComponent) {
+    event.preventDefault();
+    store.removeComponent(store.selectedComponent.id);
+  }
+}
+
+function handleUndo() {
+  store.undo();
+}
+
+function handleRedo() {
+  store.redo();
+}
 
 function createNewProject() {
   newProjectName.value = '';
@@ -151,6 +195,34 @@ async function submitNewProject() {
   display: flex;
   gap: 12px;
   align-items: center;
+}
+
+.history-controls {
+  display: flex;
+  gap: 4px;
+  margin-right: 8px;
+}
+
+.history-btn {
+  padding: 6px 10px;
+  font-size: 18px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--panel-bg);
+  color: var(--text-color);
+  cursor: pointer;
+  transition: background 0.2s;
+  line-height: 1;
+}
+
+.history-btn:hover:not(:disabled) {
+  background: var(--bg-color);
+  border-color: var(--primary-color);
+}
+
+.history-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .new-project-btn {
@@ -247,5 +319,30 @@ async function submitNewProject() {
 
 .submit-btn {
   background: var(--primary-color);
+}
+
+/* Error Toast */
+.error-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #dc3545;
+  color: white;
+  padding: 16px 24px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 2000;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 </style>

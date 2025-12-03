@@ -95,6 +95,22 @@
         </div>
       </div>
 
+      <div v-if="selectedItem.children && selectedItem.children.length > 0" class="children-section">
+        <h4 class="section-title">Nested Children ({{ selectedItem.children.length }})</h4>
+        <div class="children-list">
+          <div 
+            v-for="child in selectedItem.children" 
+            :key="child.id"
+            class="child-item"
+          >
+            <div class="child-info">
+              <span class="child-type">{{ child.componentType }}</span>
+              <span class="child-id">{{ child.id.substring(0, 8) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="actions">
         <button class="delete-btn" @click="deleteItem">Delete Component</button>
       </div>
@@ -177,6 +193,43 @@ function formatLabel(key: string): string {
   margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid var(--border-color);
+}
+
+.children-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.children-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.child-item {
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.child-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.child-type {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.child-id {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: monospace;
 }
 
 .section-title {

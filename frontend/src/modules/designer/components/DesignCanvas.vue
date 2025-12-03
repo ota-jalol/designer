@@ -33,19 +33,58 @@
           :w="item.w"
           :h="item.h"
           :i="item.i"
-          :class="{ selected: item.id === selectedItemId }"
+          :class="{ selected: item.id === selectedItemId, 'is-container': isContainerType(item.componentType) }"
           @click="selectItem(item)"
         >
-          <div class="grid-item-content">
-            <div class="item-label">{{ item.componentType }}</div>
+          <div 
+            class="grid-item-content"
+            :class="{ 'drop-target': isContainerType(item.componentType) }"
+            @dragover.prevent="onDragOverItem($event, item)"
+            @drop.stop="onDropIntoItem($event, item)"
+          >
+            <div class="item-header">
+              <div class="item-label">{{ item.componentType }}</div>
+              <div class="item-actions">
+                <button 
+                  v-if="isContainerType(item.componentType)" 
+                  class="add-child-btn" 
+                  @click.stop="showAddChildMenu(item)"
+                  title="Add child component"
+                >+</button>
+                <button class="delete-btn" @click.stop="removeItem(item.id)" title="Delete">×</button>
+              </div>
+            </div>
             <component
               :is="item.componentType"
               v-bind="item.props"
               class="item-preview"
+              :class="{ 'has-children': item.children && item.children.length > 0 }"
             >
               {{ getPreviewText(item) }}
+              
+              <!-- Render nested children -->
+              <div v-if="item.children && item.children.length > 0" class="nested-children">
+                <div 
+                  v-for="child in item.children" 
+                  :key="child.id"
+                  class="nested-item"
+                  :class="{ 'selected-child': child.id === selectedItemId }"
+                  @click.stop="selectItem(child)"
+                >
+                  <div class="nested-item-header">
+                    <span class="nested-label">{{ child.componentType }}</span>
+                    <button class="nested-delete-btn" @click.stop="removeChildItem(item.id, child.id)" title="Delete">×</button>
+                  </div>
+                  <component
+                    :is="child.componentType"
+                    v-bind="child.props"
+                    class="nested-preview"
+                  >
+                    {{ getPreviewText(child) }}
+                  </component>
+                </div>
+              </div>
             </component>
-            <button class="delete-btn" @click.stop="removeItem(item.id)">×</button>
           </div>
         </grid-item>
       </grid-layout>
@@ -91,6 +130,8 @@ function onLayoutUpdated(newLayout: LayoutItem[]) {
   store.updateLayoutFromGrid(newLayout);
 }
 
+let dragOverContainer: string | null = null;
+
 function onDrop(event: DragEvent) {
   const data = event.dataTransfer?.getData('application/json');
   if (data) {
@@ -101,6 +142,53 @@ function onDrop(event: DragEvent) {
       console.error('Failed to parse dropped component', e);
     }
   }
+  dragOverContainer = null;
+}
+
+function onDragOverItem(event: DragEvent, item: LayoutItem) {
+  if (isContainerType(item.componentType)) {
+    event.stopPropagation();
+    dragOverContainer = item.id;
+  }
+}
+
+function onDropIntoItem(event: DragEvent, parentItem: LayoutItem) {
+  if (!isContainerType(parentItem.componentType)) return;
+  
+  const data = event.dataTransfer?.getData('application/json');
+  if (data) {
+    try {
+      const component: ComponentDefinition = JSON.parse(data);
+      store.addChildComponent(parentItem.id, component);
+    } catch (e) {
+      console.error('Failed to add child component', e);
+    }
+  }
+  dragOverContainer = null;
+}
+
+function isContainerType(componentType: string): boolean {
+  const containers = ['div', 'section', 'article', 'main', 'aside', 'nav', 'header', 'footer', 'form'];
+  return containers.includes(componentType);
+}
+
+function showAddChildMenu(item: LayoutItem) {
+  // For now, add a simple div child
+  const divComponent: ComponentDefinition = {
+    id: 'div-container',
+    name: 'Container',
+    category: 'Layout',
+    tag: 'div',
+    icon: '📦',
+    defaultProps: {},
+    editableProps: [],
+    defaultSize: { w: 2, h: 2 }
+  };
+  store.addChildComponent(item.id, divComponent);
+}
+
+function removeChildItem(parentId: string, childId: string) {
+  store.removeChildComponent(parentId, childId);
 }
 
 function getPreviewText(item: LayoutItem): string {
@@ -155,7 +243,15 @@ function getPreviewText(item: LayoutItem): string {
   border: 1px solid var(--border-color);
   border-radius: 4px;
   position: relative;
-  overflow: hidden;
+  overflow: auto;
+}
+
+.grid-item-content.drop-target {
+  transition: background 0.2s;
+}
+
+.grid-item-content.drop-target:hover {
+  background: rgba(66, 184, 131, 0.05);
 }
 
 .vue-grid-item.selected .grid-item-content {
@@ -163,12 +259,35 @@ function getPreviewText(item: LayoutItem): string {
   box-shadow: 0 0 0 2px rgba(66, 184, 131, 0.3);
 }
 
-.item-label {
-  font-size: 10px;
-  color: var(--text-muted);
+.vue-grid-item.is-container .grid-item-content {
+  border-style: dashed;
+}
+
+.item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   position: absolute;
   top: 2px;
   left: 4px;
+  right: 4px;
+  z-index: 10;
+}
+
+.item-label {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.item-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.grid-item-content:hover .item-actions {
+  opacity: 1;
 }
 
 .item-preview {
@@ -178,23 +297,114 @@ function getPreviewText(item: LayoutItem): string {
   overflow: hidden;
 }
 
-.delete-btn {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 20px;
-  height: 20px;
+.add-child-btn {
+  width: 18px;
+  height: 18px;
   padding: 0;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1;
-  background: rgba(255, 0, 0, 0.6);
+  background: rgba(66, 184, 131, 0.8);
+  color: white;
   border-radius: 2px;
-  opacity: 0;
-  transition: opacity 0.2s;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
 }
 
-.grid-item-content:hover .delete-btn {
+.add-child-btn:hover {
+  background: var(--primary-color);
+}
+
+.delete-btn {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+  background: rgba(255, 0, 0, 0.7);
+  color: white;
+  border-radius: 2px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.delete-btn:hover {
+  background: rgba(255, 0, 0, 0.9);
+}
+
+.nested-children {
+  margin-top: 8px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  border: 1px dashed var(--border-color);
+  min-height: 40px;
+}
+
+.nested-item {
+  background: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  padding: 6px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.nested-item:last-child {
+  margin-bottom: 0;
+}
+
+.nested-item:hover {
+  border-color: var(--primary-color);
+}
+
+.nested-item.selected-child {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 1px rgba(66, 184, 131, 0.3);
+}
+
+.nested-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.nested-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.nested-delete-btn {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  font-size: 10px;
+  line-height: 1;
+  background: rgba(255, 0, 0, 0.6);
+  color: white;
+  border-radius: 2px;
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s, background 0.2s;
+}
+
+.nested-item:hover .nested-delete-btn {
   opacity: 1;
+}
+
+.nested-delete-btn:hover {
+  background: rgba(255, 0, 0, 0.9);
+}
+
+.nested-preview {
+  font-size: 12px;
+  padding: 4px;
 }
 
 .empty-canvas {

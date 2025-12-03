@@ -254,15 +254,13 @@ export const useDesignerStore = defineStore('designer', () => {
 
   // Layout actions with history
   function addComponent(component: ComponentDefinition, x: number, y: number) {
-    const id = generateUniqueId();
     const item: LayoutItem = {
-      id,
+      id: generateUniqueId(),
       componentType: component.tag,
       x,
       y,
       w: component.defaultSize.w,
       h: component.defaultSize.h,
-      i: id, // Required by vue-grid-layout
       props: { ...component.defaultProps },
     };
     
@@ -297,68 +295,6 @@ export const useDesignerStore = defineStore('designer', () => {
     
     if (currentProject.value) {
       saveLayoutDebounced(currentProject.value.id, layout.value);
-    }
-  }
-
-  // Child component management
-  function addChildComponent(parentId: string, component: ComponentDefinition) {
-    const parent = layout.value.find(i => i.id === parentId);
-    if (!parent) return;
-
-    if (!parent.children) {
-      parent.children = [];
-    }
-
-    const childItem: LayoutItem = {
-      id: generateUniqueId(),
-      componentType: component.tag,
-      x: 0,
-      y: 0,
-      w: component.defaultSize.w,
-      h: component.defaultSize.h,
-      i: generateUniqueId(),
-      props: { ...component.defaultProps },
-    };
-
-    parent.children.push(childItem);
-    saveToHistory();
-
-    if (currentProject.value) {
-      saveLayoutDebounced(currentProject.value.id, layout.value);
-    }
-
-    return childItem;
-  }
-
-  function removeChildComponent(parentId: string, childId: string) {
-    const parent = layout.value.find(i => i.id === parentId);
-    if (!parent || !parent.children) return;
-
-    parent.children = parent.children.filter(c => c.id !== childId);
-    
-    if (selectedItem.value?.id === childId) {
-      selectedItem.value = null;
-    }
-    
-    saveToHistory();
-
-    if (currentProject.value) {
-      saveLayoutDebounced(currentProject.value.id, layout.value);
-    }
-  }
-
-  function updateChildComponent(parentId: string, childId: string, updates: Partial<LayoutItem>) {
-    const parent = layout.value.find(i => i.id === parentId);
-    if (!parent || !parent.children) return;
-
-    const childIndex = parent.children.findIndex(c => c.id === childId);
-    if (childIndex >= 0) {
-      parent.children[childIndex] = { ...parent.children[childIndex], ...updates };
-      saveToHistory();
-
-      if (currentProject.value) {
-        saveLayoutDebounced(currentProject.value.id, layout.value);
-      }
     }
   }
 
@@ -448,9 +384,6 @@ export const useDesignerStore = defineStore('designer', () => {
     addComponent,
     updateLayoutItem,
     removeLayoutItem,
-    addChildComponent,
-    removeChildComponent,
-    updateChildComponent,
     selectLayoutItem,
     updateLayout,
     loadComponents,

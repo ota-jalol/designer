@@ -32,12 +32,12 @@ export class DesignerGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('joinProject')
-  handleJoinProject(
+  async handleJoinProject(
     @ConnectedSocket() client: Socket,
     @MessageBody() projectId: string,
   ) {
     client.join(projectId);
-    const project = this.designerService.getProject(projectId);
+    const project = await this.designerService.getProject(projectId);
     return { event: 'projectJoined', data: project };
   }
 
@@ -51,41 +51,41 @@ export class DesignerGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('updateLayout')
-  handleUpdateLayout(
+  async handleUpdateLayout(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { projectId: string; layout: LayoutItem[] },
   ) {
-    const project = this.designerService.saveLayout(data.projectId, data.layout);
+    const project = await this.designerService.saveLayout(data.projectId, data.layout);
     client.to(data.projectId).emit('layoutUpdated', project?.layout);
     return { event: 'layoutSaved', data: project };
   }
 
   @SubscribeMessage('addComponent')
-  handleAddComponent(
+  async handleAddComponent(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { projectId: string; item: LayoutItem },
   ) {
-    const project = this.designerService.updateLayoutItem(data.projectId, data.item);
+    const project = await this.designerService.updateLayoutItem(data.projectId, data.item);
     client.to(data.projectId).emit('componentAdded', data.item);
     return { event: 'componentAdded', data: project };
   }
 
   @SubscribeMessage('updateComponent')
-  handleUpdateComponent(
+  async handleUpdateComponent(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { projectId: string; item: LayoutItem },
   ) {
-    const project = this.designerService.updateLayoutItem(data.projectId, data.item);
+    const project = await this.designerService.updateLayoutItem(data.projectId, data.item);
     client.to(data.projectId).emit('componentUpdated', data.item);
     return { event: 'componentUpdated', data: project };
   }
 
   @SubscribeMessage('removeComponent')
-  handleRemoveComponent(
+  async handleRemoveComponent(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { projectId: string; itemId: string },
   ) {
-    const project = this.designerService.removeLayoutItem(data.projectId, data.itemId);
+    const project = await this.designerService.removeLayoutItem(data.projectId, data.itemId);
     client.to(data.projectId).emit('componentRemoved', data.itemId);
     return { event: 'componentRemoved', data: project };
   }
@@ -94,3 +94,4 @@ export class DesignerGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.to(projectId).emit('layoutUpdated', layout);
   }
 }
+

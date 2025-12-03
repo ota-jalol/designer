@@ -2,10 +2,14 @@
   <div class="projects-page">
     <header class="page-header">
       <div class="header-content">
-        <router-link to="/" class="back-link">← Back to Designer</router-link>
         <h1>Projects</h1>
+        <p class="user-info" v-if="store.currentUser">{{ store.currentUser.name }}</p>
       </div>
-      <button @click="createNewProject" class="new-project-btn">+ New Project</button>
+      <div class="header-actions">
+        <button @click="showImportModal = true" class="import-btn">📥 Import</button>
+        <button @click="createNewProject" class="new-project-btn">+ New Project</button>
+        <button @click="handleLogout" class="logout-btn">Logout</button>
+      </div>
     </header>
 
     <main class="page-content">
@@ -21,12 +25,11 @@
           v-for="project in projects"
           :key="project.id"
           class="project-card"
-          @click="openProject(project.id)"
         >
-          <div class="project-preview">
+          <div class="project-preview" @click="openProject(project.id)">
             <span class="preview-icon">🎨</span>
           </div>
-          <div class="project-info">
+          <div class="project-info" @click="openProject(project.id)">
             <h3 class="project-name">{{ project.name }}</h3>
             <p class="project-meta">
               {{ project.layout?.length || 0 }} components
@@ -34,6 +37,10 @@
             <p class="project-date">
               Updated: {{ formatDate(project.updatedAt) }}
             </p>
+          </div>
+          <div class="project-actions">
+            <button @click.stop="handleExport(project.id)" class="action-btn" title="Export">📤</button>
+            <button @click.stop="handleDelete(project.id)" class="action-btn danger" title="Delete">🗑️</button>
           </div>
         </div>
       </div>
@@ -56,6 +63,25 @@
         </div>
       </div>
     </div>
+
+    <!-- Import Project Modal -->
+    <div v-if="showImportModal" class="modal-overlay" @click.self="showImportModal = false">
+      <div class="modal">
+        <h3>Import Project</h3>
+        <input
+          type="file"
+          accept=".json"
+          @change="handleImportFile"
+          class="file-input"
+        />
+        <div class="modal-actions">
+          <button @click="showImportModal = false" class="cancel-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error Message -->
+    <div v-if="store.error" class="error-toast">{{ store.error }}</div>
   </div>
 </template>
 
@@ -68,6 +94,7 @@ const store = useDesignerStore();
 const router = useRouter();
 
 const showNewProjectModal = ref(false);
+const showImportModal = ref(false);
 const newProjectName = ref('');
 
 const isLoading = computed(() => store.isLoading);
@@ -93,6 +120,36 @@ async function submitNewProject() {
   if (project) {
     showNewProjectModal.value = false;
     router.push(`/designer/${project.id}`);
+  }
+}
+
+async function handleExport(projectId: string) {
+  await store.exportProject(projectId);
+}
+
+async function handleDelete(projectId: string) {
+  if (confirm('Are you sure you want to delete this project?')) {
+    await store.deleteProject(projectId);
+    await store.loadProjects();
+  }
+}
+
+async function handleImportFile(event: Event) {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (file) {
+    const success = await store.importProject(file);
+    if (success) {
+      showImportModal.value = false;
+      await store.loadProjects();
+    }
+  }
+}
+
+function handleLogout() {
+  if (confirm('Are you sure you want to logout?')) {
+    store.logout();
+    router.push('/login');
   }
 }
 
@@ -122,6 +179,38 @@ function formatDate(dateStr: string): string {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.import-btn, .logout-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--panel-bg);
+  color: var(--text-color);
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.import-btn:hover {
+  background: var(--bg-color);
+}
+
+.logout-btn {
+  background: #dc3545;
+  border-color: #dc3545;
+  color: white;
+}
+
+.logout-btn:hover {
+  background: #c82333;
+  border-color: #c82333;
 }
 
 .back-link {
@@ -169,8 +258,8 @@ h1 {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   overflow: hidden;
-  cursor: pointer;
   transition: border-color 0.2s, transform 0.2s;
+  position: relative;
 }
 
 .project-card:hover {
@@ -185,10 +274,12 @@ h1 {
   align-items: center;
   justify-content: center;
   font-size: 48px;
+  cursor: pointer;
 }
 
 .project-info {
   padding: 16px;
+  cursor: pointer;
 }
 
 .project-name {
@@ -201,6 +292,38 @@ h1 {
   font-size: 13px;
   color: var(--text-muted);
   margin-bottom: 4px;
+}
+
+.project-actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 16px;
+}
+
+.action-btn {
+  flex: 1;
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--panel-bg);
+  color: var(--text-color);
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.2s;
+}
+
+.action-btn:hover {
+  background: var(--bg-color);
+}
+
+.action-btn.delete-btn {
+  color: #dc3545;
+  border-color: #dc3545;
+}
+
+.action-btn.delete-btn:hover {
+  background: #dc3545;
+  color: white;
 }
 
 /* Modal Styles */
@@ -235,6 +358,16 @@ h1 {
   margin-bottom: 16px;
 }
 
+.file-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-color);
+  color: var(--text-color);
+  cursor: pointer;
+}
+
 .modal-actions {
   display: flex;
   gap: 12px;
@@ -247,5 +380,30 @@ h1 {
 
 .submit-btn {
   background: var(--primary-color);
+}
+
+/* Error Toast */
+.error-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #dc3545;
+  color: white;
+  padding: 16px 24px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 2000;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 </style>
